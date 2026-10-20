@@ -1,0 +1,8 @@
+# Nx project-graph / file-hashing exclusions (does not affect git)
+**/node_modules
+**/dist
+**/.next
+**/.next-dev
+**/.expo
+**/coverage
+deploy

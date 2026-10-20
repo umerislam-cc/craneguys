@@ -1,0 +1,145 @@
+# ──────────────────────────────────────────────
+# TCG – Docker Compose (Development with hot-reload)
+# ──────────────────────────────────────────────
+# Usage:
+#   docker compose -f docker-compose.dev.yml up
+#   docker compose -f docker-compose.dev.yml up api   → API + Postgres only
+# ──────────────────────────────────────────────
+
+services:
+  # ── AWS SES emulator ─────────────────────────
+  # Local capture of outbound mail; UI at http://localhost:8005
+  ses-local:
+    image: domdomegg/aws-ses-v2-local:latest
+    container_name: tcg-ses-local-dev
+    restart: unless-stopped
+    ports:
+      - '8005:8005'
+    networks:
+      - tcg-dev-network
+
+  # ── PostgreSQL ───────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: tcg-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-tcg_db}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tcg_db}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tcg-dev-network
+
+  # ── API (NestJS – dev with hot-reload) ─────
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.dev
+    container_name: tcg-api-dev
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./apps/api/.env.development
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-tcg_db}
+      # ── New Relic APM ──────────────────────────
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: TCG-API
+      NEW_RELIC_NO_CONFIG_FILE: 'true'
+      NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: 'true'
+      NEW_RELIC_LOG: stdout
+    volumes:
+      # Mount source code for hot-reload
+      - ./apps/api/src:/app/apps/api/src
+      - ./apps/api/prisma:/app/apps/api/prisma
+      - ./packages/shared/src:/app/packages/shared/src
+      - ./packages/payroll-engine/src:/app/packages/payroll-engine/src
+    ports:
+      - '${API_PORT:-3000}:3000'
+      - '9229:9229' # Debugger port
+    networks:
+      - tcg-dev-network
+
+  # ── Web (Next.js – dev with hot-reload) ────
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
+    container_name: tcg-web-dev
+    restart: unless-stopped
+    depends_on:
+      - api
+    env_file:
+      - ./apps/web/.env.local
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api/v1}
+      # ── New Relic APM (Web server process) ────
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: TCG-WEB
+      NEW_RELIC_NO_CONFIG_FILE: 'true'
+      NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: 'true'
+      NEW_RELIC_LOG: stdout
+      # ── New Relic Browser ──────────────────────
+      NEXT_PUBLIC_NEW_RELIC_LICENSE_KEY: ${NEXT_PUBLIC_NEW_RELIC_LICENSE_KEY:-}
+      NEXT_PUBLIC_NEW_RELIC_ACCOUNT_ID: ${NEXT_PUBLIC_NEW_RELIC_ACCOUNT_ID:-}
+      NEXT_PUBLIC_NEW_RELIC_APPLICATION_ID: ${NEXT_PUBLIC_NEW_RELIC_APPLICATION_ID:-}
+      NEXT_PUBLIC_NEW_RELIC_TRUST_KEY: ${NEXT_PUBLIC_NEW_RELIC_TRUST_KEY:-}
+      NEXT_PUBLIC_NEW_RELIC_AGENT_ID: ${NEXT_PUBLIC_NEW_RELIC_AGENT_ID:-}
+      # ── Microsoft Clarity ──────────────────────
+      NEXT_PUBLIC_CLARITY_PROJECT_ID: ${NEXT_PUBLIC_CLARITY_PROJECT_ID:-}
+    volumes:
+      # Mount source code for hot-reload
+      - ./apps/web/src:/app/apps/web/src
+      - ./apps/web/public:/app/apps/web/public
+      - ./packages/shared/src:/app/packages/shared/src
+    ports:
+      - '${WEB_PORT:-3001}:3001'
+    networks:
+      - tcg-dev-network
+
+  # ── Mobile (Expo Web – dev with hot-reload) ─
+  mobile:
+    build:
+      context: .
+      dockerfile: apps/mobile/Dockerfile.dev
+    container_name: tcg-mobile-dev
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-http://localhost:3000/api/v1}
+    volumes:
+      # Mount source code for hot-reload
+      - ./apps/mobile/app:/app/apps/mobile/app
+      - ./apps/mobile/components:/app/apps/mobile/components
+      - ./apps/mobile/hooks:/app/apps/mobile/hooks
+      - ./apps/mobile/lib:/app/apps/mobile/lib
+      - ./apps/mobile/providers:/app/apps/mobile/providers
+      - ./apps/mobile/schemas:/app/apps/mobile/schemas
+      - ./apps/mobile/services:/app/apps/mobile/services
+      - ./apps/mobile/theme:/app/apps/mobile/theme
+      - ./apps/mobile/assets:/app/apps/mobile/assets
+      - ./packages/shared/src:/app/packages/shared/src
+    ports:
+      - '${MOBILE_PORT:-8081}:8081'
+    networks:
+      - tcg-dev-network
+
+volumes:
+  postgres_dev_data:
+    driver: local
+
+networks:
+  tcg-dev-network:
+    driver: bridge

@@ -1,0 +1,8 @@
+# Generated / machine-owned files — never reformat
+pnpm-lock.yaml
+**/dist
+**/.next
+**/.expo
+**/coverage
+**/node_modules
+.nx

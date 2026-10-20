@@ -1,0 +1,46 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Single source of truth for toolchain versions shared across workspaces.
+# Reference from a package.json with "catalog:" — never write a version there.
+# Deliberately NOT catalogued: typescript / react / jest for @tcg/mobile (pinned by Expo SDK).
+catalog:
+  '@eslint/js': ^10.0.1
+  '@types/node': ^22.20.1
+  eslint: ^10.2.0
+  eslint-config-prettier: ^10.1.8
+  eslint-plugin-import-x: ^4.15.0
+  eslint-plugin-prettier: ^5.5.5
+  globals: ^17.4.0
+  prettier: ^3.8.1
+  typescript: ^6.0.2
+  typescript-eslint: ^8.58.0
+
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - 'prisma'
+  - '@nestjs/core'
+
+# pnpm 10+ reads these from this file, not package.json's "pnpm" key.
+peerDependencyRules:
+  allowedVersions:
+    class-validator: '0.15.1'
+    react: '19.1.0'
+    '@types/react': '19.1.17'
+    '@react-navigation/native': '7.1.28'
+    eslint: '10.2.0'
+
+overrides:
+  tar: '>=7.5.11'
+  undici: '>=6.24.0'
+  node-forge: '>=1.4.0'
+  '@xmldom/xmldom': '>=0.8.12'
+  flatted: '>=3.4.2'
+  path-to-regexp: '>=8.4.0'
+  picomatch: '>=4.0.4'
+  lodash: '>=4.18.0'
+  hono: '>=4.12.12'
+  '@hono/node-server': '>=1.19.13'
+  '@react-native/dev-middleware': '>=0.85.0'

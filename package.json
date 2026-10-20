@@ -1,0 +1,140 @@
+{
+  "name": "tcg",
+  "version": "0.0.1",
+  "private": true,
+  "description": "TCG Enterprise Monorepo",
+  "scripts": {
+    "local:all": "pnpm lint:local && pnpm db:generate && pnpm db:dbml && pnpm db:recover && pnpm api:dev",
+    "api:dev": "pnpm nx run @tcg/api:start:dev",
+    "api:dev:swc": "pnpm nx run @tcg/api:start:dev:swc",
+    "api:staging": "NODE_ENV=staging pnpm nx run @tcg/api:start:dev",
+    "staging:local": "bash scripts/staging-local.sh",
+    "staging:local:tunnel": "bash deploy/staging-db-tunnel.sh --port 15432 --background",
+    "staging:local:stop": "bash deploy/staging-db-tunnel.sh --port 15432 --stop-tunnel",
+    "staging:local:restart": "bash deploy/staging-db-tunnel.sh --port 15432 --stop-tunnel && bash deploy/staging-db-tunnel.sh --port 15432 --background",
+    "api:build": "pnpm nx run @tcg/api:build",
+    "api:start": "pnpm nx run @tcg/api:start:prod",
+    "api:lint": "pnpm nx run @tcg/api:lint",
+    "api:lint:fix": "pnpm nx run @tcg/api:lint:fix",
+    "api:test": "pnpm nx run @tcg/api:test",
+    "db:generate": "pnpm --filter @tcg/api prisma:generate",
+    "db:migrate": "pnpm --filter @tcg/api prisma:migrate",
+    "db:deploy": "pnpm --filter @tcg/api prisma:deploy",
+    "db:recover": "pnpm --filter @tcg/api prisma:recover",
+    "db:squash-resolve": "pnpm --filter @tcg/api prisma:squash-resolve",
+    "db:reset": "pnpm --filter @tcg/api prisma:reset",
+    "db:seed": "pnpm --filter @tcg/api prisma:seed",
+    "fcc:sync": "pnpm --filter @tcg/api fcc:sync",
+    "db:studio": "pnpm --filter @tcg/api prisma:studio",
+    "db:dbml": "pnpm --filter @tcg/api prisma:dbml",
+    "web:dev": "pnpm nx run @tcg/web:dev",
+    "web:staging": "pnpm nx run @tcg/web:staging",
+    "web:build": "pnpm nx run @tcg/web:build",
+    "web:start": "pnpm nx run @tcg/web:start",
+    "web:lint": "pnpm nx run @tcg/web:lint",
+    "web:clean": "pnpm --filter @tcg/web clean:dev",
+    "mobile:start": "pnpm nx run @tcg/mobile:start",
+    "mobile:android": "pnpm nx run @tcg/mobile:android",
+    "mobile:build:android": "pnpm --filter @tcg/mobile build:android",
+    "mobile:build:android:local": "pnpm --filter @tcg/mobile build:android:local",
+    "mobile:ios": "pnpm nx run @tcg/mobile:ios",
+    "mobile:lint": "pnpm nx run @tcg/mobile:lint",
+    "nx": "NX_LOAD_DOT_ENV_FILES=false nx",
+    "shared:build": "pnpm nx run @tcg/shared:build",
+    "payroll-engine:build": "pnpm nx run @tcg/payroll-engine:build",
+    "lint:local": "pnpm nx run-many -t lint -p @tcg/shared @tcg/api",
+    "lint": "pnpm nx run-many -t lint",
+    "build": "pnpm nx run-many -t build",
+    "test": "pnpm nx run-many -t test",
+    "typecheck": "pnpm nx run-many -t typecheck",
+    "affected": "pnpm nx affected -t lint build test",
+    "affected:build": "pnpm nx affected -t build",
+    "affected:lint": "pnpm nx affected -t lint",
+    "affected:test": "pnpm nx affected -t test",
+    "graph": "pnpm nx graph",
+    "nx:reset": "pnpm nx reset",
+    "clean": "pnpm nx reset && pnpm -r exec rm -rf dist node_modules",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:build": "docker compose build",
+    "docker:dev": "docker compose -f docker-compose.dev.yml up",
+    "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:logs": "docker compose logs -f",
+    "docker:migrate": "docker compose run --rm migrate",
+    "setup:skills": "bash scripts/setup-skills.sh",
+    "worktree:bootstrap": "bash scripts/worktree-bootstrap.sh",
+    "worktree:add": "bash scripts/worktree-add.sh",
+    "worktree:done": "bash scripts/worktree-done.sh",
+    "worktree:remove": "bash scripts/worktree-remove.sh",
+    "prepare": "git config core.hooksPath .husky || true"
+  },
+  "devDependencies": {
+    "lint-staged": "^16.4.0",
+    "nx": "^23.1.1",
+    "prettier": "catalog:"
+  },
+  "lint-staged": {
+    "apps/api/src/**/*.{ts,tsx}": [
+      "pnpm --filter @tcg/api exec eslint --fix",
+      "pnpm --filter @tcg/api exec prettier --write"
+    ],
+    "apps/api/fcc-seeder/**/*.ts": [
+      "pnpm --filter @tcg/api exec eslint --fix",
+      "pnpm --filter @tcg/api exec prettier --write"
+    ],
+    "apps/web/src/**/*.{ts,tsx}": [
+      "pnpm --filter @tcg/web exec eslint --fix",
+      "pnpm --filter @tcg/web exec prettier --write"
+    ],
+    "apps/mobile/**/*.{ts,tsx}": [
+      "pnpm --filter @tcg/mobile exec eslint --fix",
+      "pnpm --filter @tcg/mobile exec prettier --write"
+    ],
+    "packages/shared/src/**/*.{ts,tsx}": [
+      "pnpm --filter @tcg/shared exec eslint --fix",
+      "pnpm --filter @tcg/shared exec prettier --write"
+    ],
+    "packages/payroll-engine/src/**/*.{ts,tsx}": [
+      "pnpm --filter @tcg/payroll-engine exec eslint --fix",
+      "pnpm --filter @tcg/payroll-engine exec prettier --write"
+    ],
+    "qa-automation/**/*.ts": [
+      "scripts/lint-staged-qa.sh"
+    ],
+    "**/*.{json,md,yml,yaml}": [
+      "pnpm exec prettier --write"
+    ]
+  },
+  "engines": {
+    "node": "22.22.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.30.2+sha512.36cdc707e7b7940a988c9c1ecf88d084f8514b5c3f085f53a2e244c2921d3b2545bc20dd4ebe1fc245feec463bb298aecea7a63ed1f7680b877dc6379d8d0cb4",
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "class-validator": "0.15.1",
+        "react": "19.2.3",
+        "@types/react": "19.2.2",
+        "@react-navigation/native": "7.1.28",
+        "eslint": "10.2.0"
+      }
+    },
+    "overrides": {
+      "tar": ">=7.5.11",
+      "undici": ">=6.24.0",
+      "node-forge": ">=1.4.0",
+      "@xmldom/xmldom": "0.8.12",
+      "flatted": ">=3.4.2",
+      "path-to-regexp": ">=8.4.0",
+      "picomatch": ">=4.0.4",
+      "lodash": ">=4.18.0",
+      "hono": ">=4.12.12",
+      "@hono/node-server": ">=1.19.13",
+      "@react-native/dev-middleware": ">=0.85.0"
+    }
+  },
+  "dependencies": {
+    "@radix-ui/react-dropdown-menu": "^2.1.16"
+  }
+}

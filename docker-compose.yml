@@ -1,0 +1,155 @@
+# ──────────────────────────────────────────────
+# TCG – Docker Compose (Development)
+# ──────────────────────────────────────────────
+# Usage:
+#   docker compose up              → Start all services
+#   docker compose up -d           → Start in background
+#   docker compose up api web      → Start specific services
+#   docker compose down            → Tear down
+#   docker compose down -v         → Tear down + remove volumes
+#   docker compose logs -f api     → Tail API logs
+# ──────────────────────────────────────────────
+
+services:
+  # ── PostgreSQL ───────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: tcg-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-tcg_db}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-tcg_db}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tcg-network
+
+  # ── API (NestJS) ────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: tcg-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-tcg_db}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3001}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-15m}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-7d}
+      # ── New Relic APM ──────────────────────────
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: TCG-API
+      # ── Vehicle tracking (Samsara) ─────────────
+      SAMSARA_API_TOKEN: ${SAMSARA_API_TOKEN:-}
+      # Blank falls back to DEFAULT_FLEET_TIMEZONE in @tcg/shared — the one copy.
+      FLEET_TIMEZONE: ${FLEET_TIMEZONE:-}
+    ports:
+      - '${API_PORT:-3000}:3000'
+    networks:
+      - tcg-network
+
+  # ── Web (Next.js) ──────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api/v1}
+        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-}
+        NEXT_PUBLIC_RELEASE_STAGE: ${NEXT_PUBLIC_RELEASE_STAGE:-}
+        NEXT_PUBLIC_BUGSNAG_API_KEY: ${NEXT_PUBLIC_BUGSNAG_API_KEY:-}
+        NEXT_PUBLIC_CLARITY_PROJECT_ID: ${NEXT_PUBLIC_CLARITY_PROJECT_ID:-}
+        NEXT_PUBLIC_NEW_RELIC_LICENSE_KEY: ${NEXT_PUBLIC_NEW_RELIC_LICENSE_KEY:-}
+        NEXT_PUBLIC_NEW_RELIC_ACCOUNT_ID: ${NEXT_PUBLIC_NEW_RELIC_ACCOUNT_ID:-}
+        NEXT_PUBLIC_NEW_RELIC_APPLICATION_ID: ${NEXT_PUBLIC_NEW_RELIC_APPLICATION_ID:-}
+        NEXT_PUBLIC_NEW_RELIC_TRUST_KEY: ${NEXT_PUBLIC_NEW_RELIC_TRUST_KEY:-}
+        NEXT_PUBLIC_NEW_RELIC_AGENT_ID: ${NEXT_PUBLIC_NEW_RELIC_AGENT_ID:-}
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY:-}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:-}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID:-}
+        NEXT_PUBLIC_FIREBASE_VAPID_KEY: ${NEXT_PUBLIC_FIREBASE_VAPID_KEY:-}
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY:-}
+        NEXT_PUBLIC_FLEET_TIMEZONE: ${NEXT_PUBLIC_FLEET_TIMEZONE:-}
+        APPLE_TEAM_ID: ${APPLE_TEAM_ID:-}
+    container_name: tcg-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api/v1}
+      # ── New Relic Browser ──────────────────────
+      NEXT_PUBLIC_NEW_RELIC_LICENSE_KEY: ${NEXT_PUBLIC_NEW_RELIC_LICENSE_KEY:-}
+      NEXT_PUBLIC_NEW_RELIC_ACCOUNT_ID: ${NEXT_PUBLIC_NEW_RELIC_ACCOUNT_ID:-}
+      NEXT_PUBLIC_NEW_RELIC_APPLICATION_ID: ${NEXT_PUBLIC_NEW_RELIC_APPLICATION_ID:-}
+      NEXT_PUBLIC_NEW_RELIC_TRUST_KEY: ${NEXT_PUBLIC_NEW_RELIC_TRUST_KEY:-}
+      NEXT_PUBLIC_NEW_RELIC_AGENT_ID: ${NEXT_PUBLIC_NEW_RELIC_AGENT_ID:-}
+      # ── New Relic APM (Web server process) ────
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: TCG-WEB
+    ports:
+      - '${WEB_PORT:-3001}:3001'
+    networks:
+      - tcg-network
+
+  # ── Mobile (Expo Web) ─────────────────────
+  mobile:
+    build:
+      context: .
+      dockerfile: apps/mobile/Dockerfile
+      args:
+        EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-http://localhost:3000/api/v1}
+    container_name: tcg-mobile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '${MOBILE_PORT:-3002}:3002'
+    networks:
+      - tcg-network
+
+  # ── Database Migrations ────────────────────
+  # One-shot container that runs Prisma migrations & seed, then exits.
+  # Use: docker compose run --rm migrate
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: builder
+    container_name: tcg-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-tcg_db}
+    working_dir: /app/apps/api
+    entrypoint: ['sh', '-c', 'sh prisma/scripts/migrate-deploy.sh && npx prisma db seed']
+    networks:
+      - tcg-network
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  tcg-network:
+    driver: bridge

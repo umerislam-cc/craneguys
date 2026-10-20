@@ -1,0 +1,62 @@
+# ──────────────────────────────────────────────
+# Docker ignore – keeps build context small & fast
+# ──────────────────────────────────────────────
+
+# Version control
+.git
+.gitignore
+
+# Dependencies (installed inside container)
+**/node_modules
+**/.pnpm-store
+
+# Build outputs
+**/dist
+**/build
+**/.next
+**/.next-dev
+**/out
+
+# Environment files (passed via docker-compose)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Test & coverage
+**/coverage
+**/*.spec.ts
+**/*.test.ts
+**/test
+
+# Tooling / caches
+**/.turbo
+**/.cache
+**/.eslintcache
+**/.parcel-cache
+
+# Documentation
+*.md
+!README.md
+LICENSE
+
+# Docker files (prevent recursive copy)
+**/Dockerfile*
+docker-compose*.yml
+
+# IDE
+.idea
+.vscode
+.cursor
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+**/logs
+**/*.log
+**/npm-debug.log*
+**/pnpm-debug.log*
+
+# Husky
+.husky

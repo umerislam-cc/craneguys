@@ -1,0 +1,162 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+.next-dev/
+out/
+.design
+# Environment variables - never commit these
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Uploads
+uploads/
+
+# Coverage
+coverage/
+*.lcov
+
+# Cache & tooling
+.turbo/
+.cache/
+.eslintcache
+.parcel-cache
+.worktree
+.worktrees
+.worktree/
+.worktrees/
+.ai-worktrees
+.ai-worktrees/
+
+# Prisma
+prisma/migrations/dev.db
+prisma/migrations/dev.db-journal
+
+# FCC seeder extract dumps. seed-files/ and generated/customers.json ARE committed on
+# purpose (2026-09-17 decision): production has no FCC DB access and reads these
+# committed files instead of extracting live — see fcc-seeder/README.md. They contain
+# real customer names/addresses, not just dummy PII, so that decision was made knowingly.
+# Only the other generated/ artifacts (schema introspection, id-map — extraction-time-only,
+# not read by seed-all.ts) stay out of git.
+apps/api/fcc-seeder/generated/*
+!apps/api/fcc-seeder/generated/.gitkeep
+!apps/api/fcc-seeder/generated/customers.json
+*.db
+*.db-journal
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Testing
+jest.config.js.bak
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+
+app-example
+
+# generated native folders
+/ios
+/android
+
+# Design source zips (kept locally, not committed)
+*.zip
+
+# ai — no trailing slash so worktree symlinks (git treats them as files) stay ignored too
+.ai
+CLAUDE.md
+AGENTS.md
+DESIGN.md
+AUTOMATED-FEATURES.md
+DESIGN-FOLDER-UPDATE.md
+QUICK-REFERENCE.md
+# local skills bundle (from team zip — extract at repo root, then pnpm setup:skills)
+.agent
+.agents
+.claude
+.cursor
+.codex
+.opencode
+opencode.json
+# AI-agent files Nx writes with `nx configure-ai-agents` (Copilot / OpenCode). Tool config,
+# not project memory — the shared layer is .ai. `.github/workflows/` stays tracked.
+.github/skills/
+.github/agents/
+.github/prompts/
+.omc/
+**/.omc/
+SETUP.txt
+quotation.pdf
+.design-ref/
+
+# Nx
+.nx/cache
+.nx/workspace-data
+.nx/polygraph
+
+# git hooks are tracked in .husky/ (core.hooksPath=.husky, set by "pnpm install"); legacy husky runtime dir:
+.husky/_/
+
+# Local database dumps taken before destructive migrations (never commit — real tenant data).
+.tcg-backups/
