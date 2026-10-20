@@ -1,0 +1,17 @@
+#!/bin/sh
+# Tracked git hook — runs in the main checkout AND in every linked worktree.
+# Wired by `pnpm install` (root "prepare" sets core.hooksPath=.husky, which is shared config).
+# Bypass for emergencies only: `git commit --no-verify`.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+if [ ! -x node_modules/.bin/lint-staged ]; then
+  echo "pre-commit: this checkout has no node_modules ($(pwd))." >&2
+  echo "            Worktrees are not installed automatically — run 'pnpm install' here first" >&2
+  echo "            (fast: it links from the shared pnpm store). Refusing to commit ungated." >&2
+  exit 1
+fi
+
+# Lint/format only. Build stays on pre-push (with lint/typecheck) so commits stay cheap
+# and a live web:dev / api:dev session is not hit by Nx cache restore on every commit.
+pnpm exec lint-staged

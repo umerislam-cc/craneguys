@@ -1,0 +1,115 @@
+name: PR size
+
+# One PR = one AI-DLC unit, or one independent task. Budget: ~400 changed source lines and
+# 25 source files. Tests, migrations, lockfiles and snapshots are not counted.
+# Over budget: the check fails and a comment lists the commits to split along. A developer
+# who decides the PR must stay whole adds the `size-exception` label and says why in the PR.
+# The free plan cannot make this block a merge; the red check and the comment are the signal.
+# Rule and decision: .ai/claude/CLAUDE.md → "One unit or one independent task per PR".
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  MAX_LINES: 400
+  MAX_FILES: 25
+  EXCLUDE: '(\.spec\.|\.test\.|/e2e/|__tests__/|^qa-automation/|/migrations/|pnpm-lock\.yaml$|\.snap$|^apps/api/prisma/schema\.dbml$)'
+
+jobs:
+  size:
+    name: Within one-unit budget
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Measure
+        id: measure
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git diff --numstat "$BASE"...HEAD > all.tsv
+          grep -Ev "$EXCLUDE" all.tsv > src.tsv || true
+          lines=$(awk -F'\t' '{a=($1=="-")?0:$1; d=($2=="-")?0:$2; s+=a+d} END{print s+0}' src.tsv)
+          files=$(wc -l < src.tsv | tr -d ' ')
+          total_files=$(wc -l < all.tsv | tr -d ' ')
+          {
+            echo "lines=$lines"
+            echo "files=$files"
+            echo "total_files=$total_files"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "**By area** (source only — changed lines, files):"
+            echo
+            awk -F'\t' '{split($3,p,"/"); k=(p[1]=="apps"||p[1]=="packages")?p[1]"/"p[2]:p[1]; a=($1=="-")?0:$1; d=($2=="-")?0:$2; l[k]+=a+d; n[k]++} END{for(k in l) printf "%d\t%d\t%s\n", l[k], n[k], k}' src.tsv \
+              | sort -rn | awk -F'\t' '{printf "- `%s` — %d lines, %d files\n", $3, $1, $2}'
+            echo
+            echo "**Commits** — each line is a candidate PR boundary:"
+            echo
+            git log --no-merges --format='- `%h` %s' "$BASE"..HEAD | head -60
+          } > breakdown.md
+          echo "Source: $lines lines in $files files (all files incl. tests/migrations: $total_files)"
+
+      - name: Comment
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        env:
+          LINES: ${{ steps.measure.outputs.lines }}
+          FILES: ${{ steps.measure.outputs.files }}
+          TOTAL_FILES: ${{ steps.measure.outputs.total_files }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- pr-size-check -->';
+            const lines = Number(process.env.LINES), files = Number(process.env.FILES);
+            const maxLines = Number(process.env.MAX_LINES), maxFiles = Number(process.env.MAX_FILES);
+            const over = lines > maxLines || files > maxFiles;
+            const pr = context.payload.pull_request;
+            const excepted = pr.labels.some(l => l.name === 'size-exception');
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo, issue_number: pr.number, per_page: 100,
+            });
+            const mine = comments.find(c => c.body && c.body.includes(marker));
+            if (!over && !mine) return;
+            const head = over
+              ? `### PR is over the one-unit budget${excepted ? ' — `size-exception` set by a developer' : ''}\n\n` +
+                `**${lines}** source lines in **${files}** source files (budget ${maxLines} / ${maxFiles}; ` +
+                `${process.env.TOTAL_FILES} files in total including tests, migrations and lockfiles).\n\n` +
+                `One PR = one AI-DLC unit or one independent task. Split along the units or commits below — ` +
+                `dependent units as **stacked PRs** (the next branch starts from this one and targets it). ` +
+                `Lint/format sweeps, dependency or SDK upgrades and unrelated fixes are their own PR.\n\n` +
+                (excepted ? '' : 'If a developer decides this must stay one PR, add the `size-exception` label and give the reason in the description.\n\n') +
+                fs.readFileSync('breakdown.md', 'utf8')
+              : `### PR is within the one-unit budget\n\n**${lines}** source lines in **${files}** source files (budget ${maxLines} / ${maxFiles}).`;
+            const body = `${marker}\n${head}`;
+            if (mine) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: pr.number, body });
+            }
+
+      - name: Verdict
+        env:
+          LINES: ${{ steps.measure.outputs.lines }}
+          FILES: ${{ steps.measure.outputs.files }}
+          EXCEPTED: ${{ contains(github.event.pull_request.labels.*.name, 'size-exception') }}
+        run: |
+          if [ "$LINES" -le "$MAX_LINES" ] && [ "$FILES" -le "$MAX_FILES" ]; then
+            echo "Within budget: $LINES lines, $FILES files."
+          elif [ "$EXCEPTED" = "true" ]; then
+            echo "::warning::Over budget ($LINES lines, $FILES files) — size-exception set by a developer."
+          else
+            echo "::error::Over budget: $LINES source lines in $FILES source files (max $MAX_LINES / $MAX_FILES). Split into one unit or one independent task per PR, or a developer adds the size-exception label with a reason."
+            exit 1
+          fi

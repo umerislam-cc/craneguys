@@ -1,0 +1,23 @@
+#!/bin/sh
+# Tracked git hook — runs in the main checkout AND in every linked worktree.
+# Branch guard only: never push main/master directly — branch and open a PR.
+# Lint/typecheck/build/dropdown-check gates removed from pre-push (CI runs them
+# on the PR instead) — kept out of this file, not deleted, so they're easy to restore.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+branch=$(git symbolic-ref --quiet --short HEAD || echo detached)
+if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+  echo "pre-push: refusing to push '$branch' directly. Branch first and open a PR." >&2
+  exit 1
+fi
+
+# --- gates removed ---
+# base=origin/main
+# git rev-parse --verify --quiet "$base" >/dev/null || base=main
+#
+# pnpm nx affected -t lint --exclude=@tcg/web --base="$base"
+# pnpm nx affected -t typecheck --exclude=@tcg/mobile --base="$base"
+# pnpm nx affected -t build --base="$base"
+#
+# sh scripts/check-dropdown-preloads.sh

@@ -1,0 +1,49 @@
+name: Deploy to AWS ECS
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'What to deploy'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - api
+          - web
+
+permissions:
+  id-token: write # Required if using AWS OIDC authentication
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # Note: We recommend configuring OIDC with AWS to avoid long-lived credentials.
+          # If using OIDC, uncomment 'role-to-assume' and remove access-key lines.
+          # role-to-assume: arn:aws:iam::123456789012:role/my-github-actions-role
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Process Deployment Script
+        run: chmod +x ./deploy/deploy.sh ./deploy/config.sh
+
+      - name: Execute Deploy Script
+        run: |
+          case "${{ inputs.target }}" in
+            api) ./deploy/deploy.sh --tag=${{ github.sha }} --api --migrate ;;
+            web) ./deploy/deploy.sh --tag=${{ github.sha }} --web ;;
+            *)   ./deploy/deploy.sh --tag=${{ github.sha }} --build --migrate ;;   # all
+          esac
